@@ -1,0 +1,60 @@
+{
+  description = "a justfile that takes a Pandoc-flavored markdown file and
+  renders it as a resume in various formats";
+
+  inputs = {
+    nixpkgs.url = "github:NixOS/nixpkgs/23d72dabcb3b12469f57b37170fcbc1789bd7457";
+    nixpkgs-master.url = "github:NixOS/nixpkgs/b28c4999ed71543e71552ccfd0d7e68c581ba7e9";
+    utils.url = "https://flakehub.com/f/numtide/flake-utils/0.1.102";
+    utils-pandoc.url = "github:friedenberg/dev-flake-templates?dir=pandoc";
+    html-to-pdf.url = "github:friedenberg/eng?dir=pkgs/alfa/html-to-pdf";
+  };
+
+  outputs = { self, nixpkgs, nixpkgs-master, utils, utils-pandoc, html-to-pdf }:
+    utils.lib.eachDefaultSystem (system:
+      let
+        pkgs = import nixpkgs { inherit system; };
+        name = "resume-builder";
+
+        buildInputs = with pkgs; [
+          pandoc
+          just
+          html-to-pdf
+        ];
+
+        resume-builder = (
+          pkgs.writeScriptBin name (builtins.readFile ./justfile)
+        ).overrideAttrs (old: {
+          buildCommand = "${old.buildCommand}\n patchShebangs $out";
+        });
+
+        # to include all the templates and styles
+        src = ./.;
+
+      in
+      rec {
+        defaultPackage = packages.resume-builder;
+        packages.resume-builder = pkgs.symlinkJoin {
+          name = name;
+          paths = [
+            resume-builder
+            src
+          ] ++ buildInputs;
+
+          buildInputs = [ pkgs.makeWrapper ];
+          postBuild = "wrapProgram $out/bin/${name} --prefix PATH : $out/bin";
+        };
+
+        devShells.default = pkgs.mkShell {
+          packages = (with pkgs; [
+            pandoc
+            just
+            html-to-pdf.packages.${system}.html-to-pdf
+            resume-builder
+          ]);
+
+          inputsFrom = [ ];
+        };
+      }
+    );
+}
