@@ -57,7 +57,7 @@
             [
               pandoc
               just
-              html-to-pdf.packages.${system}.html-to-pdf
+              html-to-pdf.packages.${system}.default
               resume-builder
             ]
           );
